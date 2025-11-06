@@ -3,11 +3,13 @@ package com.example.demo.restController;
 import com.example.demo.entity.Asset;
 import com.example.demo.service.AssetService;
 import com.example.demo.service.AuditService;
+import com.example.demo.service.BarcodeScanService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.ContentDisposition;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -23,10 +25,14 @@ public class AssetRestController {
 
     private final AssetService assetService;
     private final AuditService auditService;
+    private final BarcodeScanService barcodeScanService;
 
-    public AssetRestController(AssetService assetService, AuditService auditService) {
+    public AssetRestController(AssetService assetService, 
+                               AuditService auditService,
+                               BarcodeScanService barcodeScanService) {
         this.assetService = assetService;
         this.auditService = auditService;
+        this.barcodeScanService = barcodeScanService;
     }
 
     @GetMapping("/assets")
@@ -68,9 +74,9 @@ public class AssetRestController {
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("message", "Asset captured successfully!");
-            response.put("assetId", asset.getId());
-            response.put("deviceNumber", asset.getDeviceNumber());
+            response.put("message", "Asset captured and barcode scan saved successfully!");
+            response.put("assetId", asset.getId() != null ? asset.getId() : null);
+            response.put("deviceNumber", asset.getDeviceNumber() != null ? asset.getDeviceNumber() : "N/A");
 
             return ResponseEntity.ok(response);
 
@@ -80,6 +86,27 @@ public class AssetRestController {
             response.put("message", "Failed to capture asset: " + e.getMessage());
 
             return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @GetMapping("/barcode-scans/export")
+    public ResponseEntity<byte[]> exportBarcodeScansToExcel() {
+        try {
+            byte[] excelBytes = barcodeScanService.exportToExcel();
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.setContentDisposition(ContentDisposition.attachment()
+                    .filename("barcode-scans-export.xlsx")
+                    .build());
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(excelBytes);
+                    
+        } catch (Exception e) {
+//            log.error("Failed to export barcode scans to Excel", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

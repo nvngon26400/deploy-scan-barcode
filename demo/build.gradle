@@ -50,6 +50,9 @@ dependencies {
     implementation 'org.mapstruct:mapstruct:1.5.5.Final'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
 
+    // Apache POI for Excel export
+    implementation 'org.apache.poi:poi-ooxml:5.2.5'
+
 }
 
 tasks.named('test') {

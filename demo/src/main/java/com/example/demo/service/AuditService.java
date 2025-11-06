@@ -4,6 +4,7 @@ import com.example.demo.entity.Asset;
 import com.example.demo.entity.Audit;
 import com.example.demo.repository.AssetRepository;
 import com.example.demo.repository.AuditRepository;
+import com.example.demo.service.BarcodeScanService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,15 +22,18 @@ public class AuditService {
     private final AssetRepository assetRepository;
     private final VisionAIService visionAIService;
     private final AssetService assetService;
+    private final BarcodeScanService barcodeScanService;
 
     public AuditService(AuditRepository auditRepository,
                         AssetRepository assetRepository,
                         VisionAIService visionAIService,
-                        AssetService assetService) {
+                        AssetService assetService,
+                        BarcodeScanService barcodeScanService) {
         this.auditRepository = auditRepository;
         this.assetRepository = assetRepository;
         this.visionAIService = visionAIService;
         this.assetService = assetService;
+        this.barcodeScanService = barcodeScanService;
     }
 
     public List<Audit> getAllAudits() {
@@ -78,7 +82,19 @@ public class AuditService {
         // Save image as evidence
         String imagePath = assetService.saveAssetImage(imageFile);
 
-        return new Asset();
+        // Save barcode scan record (image + AI analysis result)
+        barcodeScanService.saveBarcodeScan(imageFile, aiAnalysis);
+
+        // Create a minimal Asset object with data from analysis result
+        Asset asset = new Asset();
+        if (analysisResult != null) {
+            String deviceNumber = (String) analysisResult.get("deviceNumber");
+            if (deviceNumber != null) {
+                asset.setDeviceNumber(deviceNumber);
+            }
+        }
+        
+        return asset;
     }
 
     public void createInitialAudit(Asset asset,
