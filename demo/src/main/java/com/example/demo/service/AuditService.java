@@ -3,6 +3,7 @@ package com.example.demo.service;
 import com.example.demo.entity.Asset;
 import com.example.demo.entity.Audit;
 import com.example.demo.exception.BarcodeNotDetectException;
+import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.repository.AssetRepository;
 import com.example.demo.repository.AuditRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +12,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -50,7 +50,7 @@ public class AuditService {
                                String notes,
                                String status) {
 
-        Optional<Audit> auditOpt = auditRepository.findById(auditId);
+        Optional<Audit> auditOpt = getAuditById(auditId);
         if (auditOpt.isEmpty()) {
             throw new IllegalArgumentException("Audit not found");
         }
@@ -68,24 +68,6 @@ public class AuditService {
         assetRepository.save(asset);
 
         return auditRepository.save(audit);
-    }
-
-    public Asset processAssetImage(MultipartFile imageFile) throws java.io.IOException {
-
-        // Analyze image with Vision AI
-        String aiAnalysis = visionAIService.analyzeAssetImage(imageFile);
-
-        if (aiAnalysis.equals("null")) {
-            throw new BarcodeNotDetectException("Cannot detect barcode");
-        }
-
-        // Save image as evidence
-        String imagePath = assetService.saveAssetImage(imageFile);
-        Asset asset = this.assetRepository.findByBarcode(aiAnalysis);
-        if (asset == null) {
-            throw new BarcodeNotDetectException("Asset with barcode " + aiAnalysis + " not found");
-        }
-        return asset;
     }
 
     public void createInitialAudit(Asset asset,

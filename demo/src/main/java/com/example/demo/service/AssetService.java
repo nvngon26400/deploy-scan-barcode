@@ -1,6 +1,8 @@
 package com.example.demo.service;
 
 import com.example.demo.entity.Asset;
+import com.example.demo.exception.BarcodeNotDetectException;
+import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.repository.AssetRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,12 +25,14 @@ import java.util.UUID;
 public class AssetService {
 
     private final AssetRepository assetRepository;
+    private final VisionAIService visionAIService;
 
     @Value("${file.upload-dir}")
     private String uploadDir;
 
-    public AssetService(AssetRepository assetRepository) {
+    public AssetService(AssetRepository assetRepository, VisionAIService visionAIService) {
         this.assetRepository = assetRepository;
+        this.visionAIService = visionAIService;
     }
 
     public List<Asset> getAllAssets() {
@@ -49,7 +53,11 @@ public class AssetService {
     }
 
     public Asset getAssetByBarcode(String barcode) {
-        return this.assetRepository.findByBarcode(barcode);
+        Asset asset = assetRepository.findByBarcode(barcode);
+        if (asset == null) {
+            throw new ResourceNotFoundException("Asset with barcode " + barcode + " not found");
+        }
+        return asset;
     }
 
     public String saveAssetImage(MultipartFile imageFile) throws IOException {
@@ -69,6 +77,24 @@ public class AssetService {
         Files.copy(imageFile.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
         return filePath.toString();
+    }
+
+    public Asset getAssetFromBarcodeImage(MultipartFile imageFile) throws java.io.IOException {
+
+        // Analyze image with Vision AI
+        String aiAnalysis = visionAIService.analyzeAssetImage(imageFile);
+
+        if (aiAnalysis.equals("null")) {
+            throw new BarcodeNotDetectException("Cannot detect barcode");
+        }
+
+        Asset asset = this.assetRepository.findByBarcode(aiAnalysis);
+        if (asset == null) {
+            throw new ResourceNotFoundException("Asset with barcode " + aiAnalysis + " not found");
+        }
+        // Save image as evidence
+        String imagePath = saveAssetImage(imageFile);
+        return asset;
     }
 
     public Asset createOrUpdateAsset(Map<String, Object> analysisResult,

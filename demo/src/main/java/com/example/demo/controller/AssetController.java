@@ -1,7 +1,6 @@
-package com.example.demo.restController;
+package com.example.demo.controller;
 
 import com.example.demo.entity.Asset;
-import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.service.AssetService;
 import com.example.demo.service.AuditService;
 import lombok.extern.slf4j.Slf4j;
@@ -13,19 +12,17 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("v1/api/assets")
 @Slf4j
-public class AssetRestController {
+public class AssetController {
 
     private final AssetService assetService;
     private final AuditService auditService;
 
-    public AssetRestController(AssetService assetService, AuditService auditService) {
+    public AssetController(AssetService assetService, AuditService auditService) {
         this.assetService = assetService;
         this.auditService = auditService;
     }
@@ -44,7 +41,7 @@ public class AssetRestController {
     @PostMapping("/capture")
     public ResponseEntity<?> captureAsset(
             @RequestParam("imageFile") MultipartFile imageFile) throws IOException {
-        Asset asset = auditService.processAssetImage(imageFile);
+        Asset asset = assetService.getAssetFromBarcodeImage(imageFile);
         return ResponseEntity.ok(asset);
     }
 
