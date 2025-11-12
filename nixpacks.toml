@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["openjdk17", "gradle"]
+
+[phases.build]
+cmds = ["chmod +x start.sh"]
+
+[start]
+cmd = "./start.sh"
