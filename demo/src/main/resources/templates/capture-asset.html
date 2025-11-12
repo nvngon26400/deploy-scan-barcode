@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capture Asset</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-clipboard-check me-2"></i>Asset Audit System
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Gallery</a>
+                <a class="nav-link" href="/audit">Dashboard</a>
+                <a class="nav-link active" href="/audit/capture">Capture Asset</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="mb-0">
+                            <i class="fas fa-camera me-2"></i>Capture Asset for Audit
+                        </h3>
+                        <p class="text-muted mb-0">Take a photo of the asset and let AI analyze it</p>
+                    </div>
+                    <div class="card-body">
+                        <!-- Error Message -->
+                        <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+                        
+                        <form action="/audit/capture" method="post" enctype="multipart/form-data">
+                            <div class="mb-4">
+                                <label for="imageFile" class="form-label">Asset Photo</label>
+                                <input type="file" class="form-control" id="imageFile" name="imageFile" 
+                                       accept="image/*" required>
+                                <div class="form-text">
+                                    Take a clear photo showing the asset, any visible barcodes, serial numbers, and location details.
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="auditorName" class="form-label">Auditor Name</label>
+                                <input type="text" class="form-control" id="auditorName" name="auditorName" 
+                                       required placeholder="Enter your name">
+                            </div>
+                            
+                            <!-- GPS Coordinates (will be filled by JavaScript) -->
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="latitude" class="form-label">Latitude</label>
+                                    <input type="number" class="form-control" id="latitude" name="latitude" 
+                                           step="any" placeholder="Auto-detected">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="longitude" class="form-label">Longitude</label>
+                                    <input type="number" class="form-control" id="longitude" name="longitude" 
+                                           step="any" placeholder="Auto-detected">
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-magic me-2"></i>Process Asset with AI
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <!-- Instructions -->
+                        <div class="card mt-4 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-lightbulb me-2"></i>Tips for Best Results
+                                </h6>
+                                <ul class="mb-0">
+                                    <li>Ensure good lighting for clear photos</li>
+                                    <li>Include any visible barcodes or QR codes</li>
+                                    <li>Show serial numbers or model information</li>
+                                    <li>Capture location context (room, desk, etc.)</li>
+                                    <li>Keep the camera steady for sharp images</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Preview Section -->
+                <div class="card mt-4" id="previewSection" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0">Photo Preview</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <img id="previewImage" class="img-fluid rounded" style="max-height: 300px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // File preview functionality
+        document.getElementById('imageFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('previewImage').src = e.target.result;
+                    document.getElementById('previewSection').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // GPS Location functionality
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                document.getElementById('latitude').value = position.coords.latitude;
+                document.getElementById('longitude').value = position.coords.longitude;
+            }, function(error) {
+                console.log('Geolocation error:', error);
+            });
+        }
+        
+        // Form validation
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const fileInput = document.getElementById('imageFile');
+            const auditorName = document.getElementById('auditorName');
+            
+            if (!fileInput.files[0]) {
+                e.preventDefault();
+                alert('Please select an image file');
+                return;
+            }
+            
+            if (!auditorName.value.trim()) {
+                e.preventDefault();
+                alert('Please enter your name');
+                return;
+            }
+            
+            // Show loading state
+            const submitBtn = document.querySelector('button[type="submit"]');
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+            submitBtn.disabled = true;
+        });
+    </script>
+</body>
+</html>

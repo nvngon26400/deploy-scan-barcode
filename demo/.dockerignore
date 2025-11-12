@@ -1,0 +1,9 @@
+# Exclude heavy and local-only directories/files from Docker context
+build/
+data/
+uploads/
+.gradle/
+.git/
+cloudflared.exe
+local.properties
+DigiCertGlobalRootG2.crt
