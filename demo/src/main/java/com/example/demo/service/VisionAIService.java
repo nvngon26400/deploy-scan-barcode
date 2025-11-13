@@ -10,8 +10,10 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -132,6 +134,132 @@ public class VisionAIService {
             mockResult.put("condition", "Unknown");
             return mockResult;
         }
+    }
+
+    /**
+     * Sử dụng AI Vision để decode barcode từ ảnh lóa sáng
+     * @param imageFile Ảnh chứa barcode
+     * @return Danh sách các barcode được phát hiện, mỗi item chứa text và format
+     */
+    public List<Map<String, String>> decodeBarcodeWithAI(MultipartFile imageFile) throws IOException {
+        if (apiKey.isEmpty()) {
+            log.warn("Vision AI API key not configured, cannot use AI barcode decoding");
+            return new ArrayList<>();
+        }
+
+        try {
+            // Encode image to base64
+            String base64Image = Base64.getEncoder().encodeToString(imageFile.getBytes());
+
+            // Prepare the request payload với prompt chuyên biệt cho barcode
+            Map<String, Object> requestBody = createBarcodeDecodeRequest(base64Image);
+
+            // Set headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Authorization", "Bearer " + apiKey);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+            // Make API call
+            ResponseEntity<String> response = restTemplate.exchange(
+                    apiUrl, HttpMethod.POST, entity, String.class);
+
+            // Parse response và trả về danh sách barcode
+            return parseBarcodeResponse(response.getBody());
+
+        } catch (Exception e) {
+            log.error("Error calling Vision AI API for barcode decoding", e);
+            return new ArrayList<>();
+        }
+    }
+
+    private Map<String, Object> createBarcodeDecodeRequest(String base64Image) {
+        Map<String, Object> request = new HashMap<>(Map.of("model", "gpt-4o"));
+
+        Map<String, Object> message = new HashMap<>(Map.of("role", "user"));
+
+        // Prompt chuyên biệt cho việc đọc barcode, kể cả khi ảnh bị lóa sáng
+        Map<String, Object> content = new HashMap<>();
+        content.put("type", "text");
+        content.put("text", "Analyze this image and extract all barcode values you can detect. " +
+                "Even if the image has glare or is overexposed, try to read the barcode. " +
+                "Return the result as a JSON array of objects, each with 'text' (the barcode value) and 'format' (the barcode format like CODE_128, QR_CODE, etc.). " +
+                "If you cannot detect any barcode, return an empty array []. " +
+                "Example format: [{\"text\": \"1234567890\", \"format\": \"CODE_128\"}]");
+
+        Map<String, Object> imageContent = new HashMap<>();
+        imageContent.put("type", "image_url");
+
+        Map<String, Object> imageUrl = new HashMap<>();
+        imageUrl.put("url", "data:image/jpeg;base64," + base64Image);
+
+        imageContent.put("image_url", imageUrl);
+
+        message.put("content", new Object[]{content, imageContent});
+
+        request.put("messages", new Object[]{message});
+        request.put("max_tokens", 1000);
+
+        return request;
+    }
+
+    private List<Map<String, String>> parseBarcodeResponse(String responseBody) {
+        List<Map<String, String>> barcodes = new ArrayList<>();
+        try {
+            JsonNode jsonNode = objectMapper.readTree(responseBody);
+            JsonNode choices = jsonNode.get("choices");
+            if (choices != null && choices.isArray() && choices.size() > 0) {
+                JsonNode message = choices.get(0).get("message");
+                if (message != null && message.has("content")) {
+                    String content = message.get("content").asText();
+                    
+                    // Thử parse JSON từ content
+                    // Content có thể là JSON array hoặc text mô tả
+                    content = content.trim();
+                    if (content.startsWith("[") && content.endsWith("]")) {
+                        // Parse JSON array
+                        JsonNode barcodeArray = objectMapper.readTree(content);
+                        if (barcodeArray.isArray()) {
+                            for (JsonNode barcodeNode : barcodeArray) {
+                                Map<String, String> barcode = new HashMap<>();
+                                if (barcodeNode.has("text")) {
+                                    barcode.put("text", barcodeNode.get("text").asText());
+                                }
+                                if (barcodeNode.has("format")) {
+                                    barcode.put("format", barcodeNode.get("format").asText());
+                                } else {
+                                    barcode.put("format", "UNKNOWN");
+                                }
+                                if (!barcode.isEmpty()) {
+                                    barcodes.add(barcode);
+                                }
+                            }
+                        }
+                    } else {
+                        // Nếu không phải JSON, thử extract barcode từ text
+                        // Tìm các chuỗi số hoặc alphanumeric có thể là barcode
+                        String[] lines = content.split("\n");
+                        for (String line : lines) {
+                            line = line.trim();
+                            // Tìm pattern giống barcode (ít nhất 4 ký tự)
+                            if (line.matches(".*[A-Z0-9]{4,}.*")) {
+                                String extracted = line.replaceAll(".*?([A-Z0-9]{4,}).*", "$1");
+                                if (extracted.length() >= 4) {
+                                    Map<String, String> barcode = new HashMap<>();
+                                    barcode.put("text", extracted);
+                                    barcode.put("format", "AI_DETECTED");
+                                    barcodes.add(barcode);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error parsing barcode response from AI", e);
+        }
+        return barcodes;
     }
 }
  
